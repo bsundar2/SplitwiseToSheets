@@ -2,7 +2,7 @@
 
 Shared by the interactive marimo dashboard (src/analytics/spending_dashboard.py)
 and covered directly by tests/test_spending_analytics.py - the same split used
-by the sibling RobinhoodToSheets repo between src/pnl_calculator.py (tested)
+by the sibling FinanceToSheets repo between src/pnl_calculator.py (tested)
 and src/pnl_tracker.py (dashboard, untested).
 
 All spend figures use the `amount` column - load_transactions_df()
