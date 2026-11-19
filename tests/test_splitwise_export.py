@@ -194,6 +194,21 @@ def test_fetch_and_write_database_dry_run(mock_fetch):
     assert url is None
 
 
+@patch("src.export.splitwise_export.fetch_from_database")
+def test_dry_run_preview_hidden_in_github_actions(mock_fetch, capsys, monkeypatch):
+    mock_fetch.return_value = pd.DataFrame(
+        [{"Amount": 50.0, "Date": "2026-04-01", "Description": "Example Cafe"}]
+    )
+
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+    fetch_and_write("2026-01-01", "2026-12-31", source=SOURCE_DATABASE, dry_run=True)
+    assert "Example Cafe" not in capsys.readouterr().out
+
+    monkeypatch.delenv("GITHUB_ACTIONS")
+    fetch_and_write("2026-01-01", "2026-12-31", source=SOURCE_DATABASE, dry_run=True)
+    assert "Example Cafe" in capsys.readouterr().out
+
+
 @patch("src.export.splitwise_export.SplitwiseClient")
 @patch("src.export.splitwise_export.load_exported_state")
 def test_fetch_and_write_splitwise_dry_run(mock_load_state, MockClient):
