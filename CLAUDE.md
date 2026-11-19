@@ -26,7 +26,8 @@ src/
 └── constants/                       # Column names, sheet names, Splitwise ids and split types
 scripts/
 ├── backfill_history.py              # Re-sync past years into SQLite
-└── print_category_budgets_template.py
+├── print_category_budgets_template.py
+└── ci/db_cache.sh                   # Encrypts/decrypts the cached database in workflows
 config/
 ├── .env.example                     # Copy to config/.env (gitignored)
 └── splitwise_category_ids.json      # Splitwise category/subcategory ids
@@ -34,10 +35,11 @@ config/
 
 ## Workflows (`.github/workflows/`)
 
-- `splitwise-sync.yml`: three times a day, runs `monthly_export_pipeline.py` for the current year. The SQLite database is kept between runs in the Actions cache.
+- `splitwise-sync.yml`: three times a day, runs `monthly_export_pipeline.py` for the current year. The SQLite database is kept between runs in the Actions cache, encrypted with the `DB_CACHE_KEY` secret by `scripts/ci/db_cache.sh`. Only ever cache the `.enc` file: the repo is public, and fork pull requests can restore caches but never get secrets.
 - `backfill-history.yml`: re-syncs historical years into that cached database. Run it manually.
 - `print_category_budgets.yml`: prints a `CATEGORY_BUDGETS` template from the category names in your data.
 - `python-tests.yml`: runs `pytest` on pushes and PRs.
+- `keepalive.yml`: once a month, re-enables the scheduled workflows, which GitHub disables after 60 days without repo activity. A new scheduled workflow goes in its list.
 
 ## Commands
 
