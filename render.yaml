@@ -1,0 +1,33 @@
+services:
+  - type: web
+    name: spending-dashboard
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: marimo run src/analytics/spending_dashboard.py --host 0.0.0.0 --port $PORT --token-password $MARIMO_TOKEN --headless
+    envVars:
+      - key: MARIMO_TOKEN
+        sync: false
+      - key: PYTHONPATH
+        value: .
+      - key: SPLITWISE_CONSUMER_KEY
+        sync: false
+      - key: SPLITWISE_CONSUMER_SECRET
+        sync: false
+      - key: SPLITWISE_API_KEY
+        sync: false
+      - key: SPLITWISE_SELF_ID
+        sync: false
+      - key: SPLITWISE_PARTNER_ID
+        sync: false
+      - key: CATEGORY_BUDGETS
+        sync: false
+      # Optional: comma-separated keys of budget spreadsheets whose
+      # "Expense Log" tab the dashboard reads instead of resyncing from
+      # Splitwise on every cold start (needs the secret file below)
+      - key: EXPENSE_LOG_SPREADSHEET_KEYS
+        sync: false
+      # Upload config/gsheets_authentication.json as a Secret File named
+      # gsheets_authentication.json; Render mounts secret files here
+      - key: GSHEETS_AUTH_FILE
+        value: /etc/secrets/gsheets_authentication.json

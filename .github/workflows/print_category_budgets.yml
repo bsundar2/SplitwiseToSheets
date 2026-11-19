@@ -1,0 +1,95 @@
+name: Print Category Budgets Template
+
+# One-off helper: prints every category currently in the local database as
+# a CATEGORY_BUDGETS JSON template ({"Category": 0, ...}) via
+# scripts/print_category_budgets_template.py - copy the output, fill in
+# real numbers, and set it as the CATEGORY_BUDGETS env var (locally in
+# config/.env, or as a Render service env var) to power the spending
+# dashboard's budget-vs-actual section. Read-only: never writes to
+# Splitwise or Sheets.
+#
+# sync_first (default true) does a bounded live resync of the last 2
+# years from Splitwise before printing - the same range/reasoning the
+# dashboard's own Render resync uses (sync_recent_years_if_on_render() in
+# src/analytics/spending_analytics.py) - so the list is accurate even if
+# the cached data/transactions.db is stale, empty, or this workflow is
+# being run from a branch with no cache of its own yet. Uncheck it for a
+# faster run once you know the cache is already warm (e.g. after the
+# daily "Sync Splitwise to Sheets" workflow has run on main).
+
+on:
+  workflow_dispatch:
+    inputs:
+      sync_first:
+        description: 'Sync the last 2 years from Splitwise first (recommended)'
+        required: false
+        type: boolean
+        default: true
+
+jobs:
+  print-template:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Restore Splitwise data cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            data/transactions.db
+            data/splitwise_expense_details_*.json
+          key: transactions-db-${{ github.ref_name }}-${{ github.run_id }}
+          restore-keys: |
+            transactions-db-${{ github.ref_name }}-
+            transactions-db-main-
+
+      - name: Sync recent years from Splitwise
+        if: ${{ github.event.inputs.sync_first == 'true' }}
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+          SPLITWISE_CONSUMER_KEY: ${{ secrets.SPLITWISE_CONSUMER_KEY }}
+          SPLITWISE_CONSUMER_SECRET: ${{ secrets.SPLITWISE_CONSUMER_SECRET }}
+          SPLITWISE_API_KEY: ${{ secrets.SPLITWISE_API_KEY }}
+          SPLITWISE_SELF_ID: ${{ secrets.SPLITWISE_SELF_ID }}
+          SPLITWISE_PARTNER_ID: ${{ secrets.SPLITWISE_PARTNER_ID }}
+        run: |
+          set -euo pipefail
+          read -r START_DATE END_DATE <<< "$(python -c '
+          from src.analytics.spending_analytics import recent_years_range
+          start, end = recent_years_range()
+          print(start, end)
+          ')"
+          python src/db_sync/sync_from_splitwise.py \
+            --start-date "$START_DATE" --end-date "$END_DATE" --live
+
+      - name: Print CATEGORY_BUDGETS template
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+          {
+            echo '```json'
+            python scripts/print_category_budgets_template.py
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Save Splitwise data cache
+        if: ${{ always() && github.event.inputs.sync_first == 'true' }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            data/transactions.db
+            data/splitwise_expense_details_*.json
+          key: transactions-db-${{ github.ref_name }}-${{ github.run_id }}

@@ -1,0 +1,6 @@
+dateparser>=1.1.0
+marimo
+pandas
+pygsheets
+python-dotenv
+splitwise
