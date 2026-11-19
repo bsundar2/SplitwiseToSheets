@@ -1,7 +1,7 @@
 name: Backfill Historical Years
 
 # One-off maintenance workflow: re-syncs historical years' Splitwise
-# expenses into the local database, using the same transactions-db-<branch>
+# expenses into the local database, using the same transactions-db-enc-<branch>
 # cache splitwise-sync.yml restores/saves - for cases where that cache
 # only reflects the current year (e.g. after a cache reset) and all-time
 # views built from the exported Sheets data lose historical data as a
@@ -56,12 +56,15 @@ jobs:
       - name: Restore Splitwise data cache
         uses: actions/cache/restore@v4
         with:
-          path: |
-            data/transactions.db
-            data/splitwise_expense_details_*.json
-          key: transactions-db-${{ github.ref_name }}-${{ github.run_id }}
+          path: data/transactions.db.enc
+          key: transactions-db-enc-${{ github.ref_name }}-${{ github.run_id }}
           restore-keys: |
-            transactions-db-${{ github.ref_name }}-
+            transactions-db-enc-${{ github.ref_name }}-
+
+      - name: Decrypt cached database
+        env:
+          DB_CACHE_KEY: ${{ secrets.DB_CACHE_KEY }}
+        run: scripts/ci/db_cache.sh decrypt
 
       - name: Write Google Sheets service account credentials
         env:
@@ -88,11 +91,15 @@ jobs:
           fi
           python scripts/backfill_history.py "${ARGS[@]}"
 
+      - name: Encrypt database for caching
+        if: always()
+        env:
+          DB_CACHE_KEY: ${{ secrets.DB_CACHE_KEY }}
+        run: scripts/ci/db_cache.sh encrypt
+
       - name: Save Splitwise data cache
         if: always()
         uses: actions/cache/save@v4
         with:
-          path: |
-            data/transactions.db
-            data/splitwise_expense_details_*.json
-          key: transactions-db-${{ github.ref_name }}-${{ github.run_id }}
+          path: data/transactions.db.enc
+          key: transactions-db-enc-${{ github.ref_name }}-${{ github.run_id }}

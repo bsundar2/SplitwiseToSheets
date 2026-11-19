@@ -47,13 +47,16 @@ jobs:
       - name: Restore Splitwise data cache
         uses: actions/cache/restore@v4
         with:
-          path: |
-            data/transactions.db
-            data/splitwise_expense_details_*.json
-          key: transactions-db-${{ github.ref_name }}-${{ github.run_id }}
+          path: data/transactions.db.enc
+          key: transactions-db-enc-${{ github.ref_name }}-${{ github.run_id }}
           restore-keys: |
-            transactions-db-${{ github.ref_name }}-
-            transactions-db-main-
+            transactions-db-enc-${{ github.ref_name }}-
+            transactions-db-enc-main-
+
+      - name: Decrypt cached database
+        env:
+          DB_CACHE_KEY: ${{ secrets.DB_CACHE_KEY }}
+        run: scripts/ci/db_cache.sh decrypt
 
       - name: Sync recent years from Splitwise
         if: ${{ github.event.inputs.sync_first == 'true' }}
@@ -85,11 +88,15 @@ jobs:
             echo '```'
           } | tee -a "$GITHUB_STEP_SUMMARY"
 
+      - name: Encrypt database for caching
+        if: ${{ always() && github.event.inputs.sync_first == 'true' }}
+        env:
+          DB_CACHE_KEY: ${{ secrets.DB_CACHE_KEY }}
+        run: scripts/ci/db_cache.sh encrypt
+
       - name: Save Splitwise data cache
         if: ${{ always() && github.event.inputs.sync_first == 'true' }}
         uses: actions/cache/save@v4
         with:
-          path: |
-            data/transactions.db
-            data/splitwise_expense_details_*.json
-          key: transactions-db-${{ github.ref_name }}-${{ github.run_id }}
+          path: data/transactions.db.enc
+          key: transactions-db-enc-${{ github.ref_name }}-${{ github.run_id }}

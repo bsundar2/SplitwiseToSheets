@@ -219,6 +219,22 @@ EXPENSES_WORKSHEET_NAME=Expenses 2026
 
 **Note:** Update `START_DATE`, `END_DATE`, and `EXPENSES_WORKSHEET_NAME` at the start of each year to automatically target the new year's data.
 
+## Running it on GitHub Actions
+
+Fork or copy this repo, then add these under **Settings → Secrets and variables → Actions → Secrets**:
+
+| Secret | Value |
+|---|---|
+| `SPLITWISE_CONSUMER_KEY`, `SPLITWISE_CONSUMER_SECRET`, `SPLITWISE_API_KEY` | Your Splitwise app's credentials |
+| `SPLITWISE_SELF_ID`, `SPLITWISE_PARTNER_ID` | Your and your partner's Splitwise user ids |
+| `SPREADSHEET_KEY` | The budget spreadsheet's key (from its URL) |
+| `GSHEETS_AUTH_JSON` | The service account JSON, pasted whole |
+| `DB_CACHE_KEY` | Any long random string, e.g. from `openssl rand -base64 32` |
+
+`splitwise-sync.yml` then runs three times a day. It keeps the SQLite database between runs in the Actions cache, encrypted with `DB_CACHE_KEY` (`scripts/ci/db_cache.sh`), because a public repo's caches can be restored by workflow runs from forks' pull requests, which never receive secrets. Changing the key makes the cached copy unreadable: the run fails until you delete the cache (**Actions → Caches**) and run the backfill below. To be safe, also set **Settings → Actions → General → Fork pull request workflows** to require approval for all external contributors.
+
+GitHub turns off a public repo's scheduled workflows after 60 days without activity, so `keepalive.yml` re-enables them once a month.
+
 ## Backfilling historical years
 
 The Monthly Export Pipeline only ever syncs the *current* year's date range into the local database - by design, since re-syncing the full multi-year history on every run would be slow and API-heavy. If the cached local database ever ends up reflecting only the current year (e.g. after a GitHub Actions cache reset or eviction), all-time views built from the exported Sheets data will silently lose prior years' data, even though Splitwise itself - the actual source of truth - is completely unaffected.
@@ -288,7 +304,7 @@ Unset, the dashboard resyncs from Splitwise as described above.
 ## Automation Considerations
 
 **Implemented:**
-- GitHub Actions scheduled execution (three times a day - see `.github/workflows/splitwise-sync.yml`): syncs the database from Splitwise and exports to Google Sheets. Budget summaries are computed directly from that raw exported data rather than a separate generated tab.
+- GitHub Actions scheduled execution (three times a day - see "Running it on GitHub Actions" above): syncs the database from Splitwise and exports to Google Sheets. Budget summaries are computed directly from that raw exported data rather than a separate generated tab.
 
 **Future enhancements:**
 - Email/Slack notifications on completion or errors
