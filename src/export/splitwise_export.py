@@ -100,6 +100,12 @@ MSG_PROCESSED_SUCCESS = "Successfully processed {count} expenses"
 MSG_NO_EXPENSES_PROCESSED = "No expenses found or processed"
 
 
+def _in_github_actions() -> bool:
+    """True in a GitHub Actions run, whose logs anyone can read in a public
+    repo, so expense rows must not be printed there."""
+    return os.getenv("GITHUB_ACTIONS") == "true"
+
+
 def load_exported_state() -> tuple[set, set]:
     """Load the set of previously exported Splitwise expense IDs and fingerprints.
 
@@ -538,8 +544,12 @@ def fetch_and_write(
         print(f"Worksheet: {worksheet_name}")
         print(f"Mode: {'Overwrite' if not append else 'Append'}")
         print(f"Transactions to export: {len(new_df)}")
-        print(f"\nPreview (first 10 rows):")
-        print(new_df.head(10).to_string(index=False))
+        if _in_github_actions():
+            # Workflow logs are public in this repo: counts only, no rows
+            print("(Row preview hidden in GitHub Actions)")
+        else:
+            print(f"\nPreview (first 10 rows):")
+            print(new_df.head(10).to_string(index=False))
         print(f"\n{'='*60}")
         return new_df, None
 
@@ -572,7 +582,8 @@ def fetch_and_write(
         )
     else:
         url = None
-        print(new_df.head())
+        if not _in_github_actions():
+            print(new_df.head())
 
     # Update state based on source
     if source == SOURCE_SPLITWISE:
